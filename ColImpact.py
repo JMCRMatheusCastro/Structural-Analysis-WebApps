@@ -532,6 +532,15 @@ L = st.sidebar.number_input("Comprimento L (m)", value=3.4)
 
 st.sidebar.subheader("Armadura e Materiais")
 bitola = st.sidebar.number_input("Bitola (mm)", value=20.0 if tipo_secao=="Retangular" else 25.0)
+
+# NOVO: Inserção dinâmica da quantidade de barras
+if tipo_secao == "Retangular":
+    n_str = st.sidebar.text_input("Distribuição das barras", value="2, 2", 
+                                  help="Digite a quantidade de barras por camada separada por vírgula. Ex: '3, 2, 3' indica 3 camadas de armadura, onde a primeira e a última são as faces extremas da seção.")
+else:
+    n_barras_circ = st.sidebar.number_input("Número total de barras", min_value=4, step=2, value=8, 
+                                            help="Deve ser um número par. O algoritmo fará a distribuição ao longo de toda a circunferência.")
+
 dLinha = st.sidebar.number_input("d' (m)", value=0.0413 if tipo_secao=="Retangular" else 0.0475)
 fck = st.sidebar.number_input("fck (kN/m²)", value=30000)
 fyk = st.sidebar.number_input("fyk (kN/m²)", value=500000)
@@ -584,12 +593,19 @@ if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_wid
         
         # --- PREPARAÇÃO DA ARMADURA ---
         if tipo_secao == "Retangular":
-            n = np.array([2,2])
+            try:
+                # Transforma a string do input (ex: "2, 2") em um numpy array
+                n_list = [int(x.strip()) for x in n_str.split(',')]
+                n = np.array(n_list)
+            except ValueError:
+                st.error("Formato inválido na 'Distribuição das barras'. Use apenas números inteiros separados por vírgula (ex: 2, 2).")
+                st.stop()
+                
             nLinha = len(n)
             ds = np.linspace(-h/2 + dLinha, h/2 - dLinha, nLinha)
         else:
             R_efet = (D/2) - (dLinha)
-            nLinha = 8 
+            nLinha = int(n_barras_circ)
             Δθ = (2*np.pi)/nLinha
             θ = np.pi/ 2 + np.arange(nLinha)*Δθ
             ds = R_efet * np.sin(θ)
