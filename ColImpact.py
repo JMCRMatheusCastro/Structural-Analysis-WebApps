@@ -235,8 +235,9 @@ def σconcrete(εc, ε0, εu, fcd, coef):
 
     mask_parabolic = (εc > 0) & (εc <= ε0)
     mask_rectangular = (εc > ε0) & (εc <= εu)
-
-    if coef == 1.1:
+    
+    # Tratamento de tolerância robusto para float
+    if abs(coef - 1.1) < 1e-5:
         σc[mask_parabolic] = 1.1 * fcd * (1 - (1 - εc[mask_parabolic]/ε0)**n)
         σc[mask_rectangular] = 1.1 * fcd
     else:
@@ -254,34 +255,34 @@ def σsteel(εs,fyd,Es):
             σsd[i]=np.sign(εs[i])*fyd
     return σsd
 
-def EquiDasForcasEMomentos(x, b, h, ds, n, fcd, fyd, Es, ε0, εu, k, N, M):
+def EquiDasForcasEMomentos(x, b_array, h, ds, n, fcd, fyd, Es, ε0, εu, k, N, M):
     dc = np.arange(0, h, 0.01)
     dc = np.append(dc, h)
     εc=εlim(dc, x, h, ε0, εu, k, ds)
     εs=εlim(ds, x, h, ε0, εu, k, ds)
     σc=σconcrete(εc,ε0,εu,fcd,0.85)
     σs=σsteel(εs,fyd,Es)
-    Rcc=integrate.trapezoid(σc*b, dc)
-    Mc=integrate.trapezoid(σc*dc*b, dc)
+    Rcc=integrate.trapezoid(σc*b_array, dc)
+    Mc=integrate.trapezoid(σc*dc*b_array, dc)
     EQ=(N-Rcc)*np.sum(n*σs*ds)+(M-N*(h/2)+Mc)*np.sum(n*σs)
     return EQ
 
-def EquiDasForcas(b,h,dc,ds,As,fcd,fyd,Es,ε0,εu,N,εm,χ,coef):
+def EquiDasForcas(b_array, h, dc, ds, As, fcd, fyd, Es, ε0, εu, N, εm, χ, coef):
     εc=ε(χ,dc,εm)
     εs=ε(χ,ds,εm)
     σc=σconcrete(εc,ε0,εu,fcd,coef)
     σs=σsteel(εs,fyd,Es)
-    Rcc=integrate.trapezoid(σc*b, dc)
+    Rcc=integrate.trapezoid(σc*b_array, dc)
     Rs=np.sum(As*σs)
     EQ=N-Rcc-Rs
     return EQ
 
-def MomentoEquilibrante(b,h,dc,ds,As,fcd,fyd,Es,ε0,εu,N,εm,χ,coef):
+def MomentoEquilibrante(b_array, h, dc, ds, As, fcd, fyd, Es, ε0, εu, N, εm, χ, coef):
     εc=ε(χ,dc,εm)
     εs=ε(χ,ds,εm)
     σc=σconcrete(εc,ε0,εu,fcd,coef)
     σs=σsteel(εs,fyd,Es)
-    Mc=integrate.trapezoid(σc*dc*b, dc)
+    Mc=integrate.trapezoid(σc*dc*b_array, dc)
     Ms=np.sum(As*σs*ds)
     return Mc+Ms
 
@@ -300,7 +301,6 @@ def momento_fissuracao(fck, b, h, D, x_raiz, alpha=1.5):
 # 3. FUNÇÕES DE PÓS-PROCESSAMENTO (GRÁFICOS P/ STREAMLIT)
 # ==========================================
 
-# Paleta de cores para os gráficos
 COLORS = {
     "Linear": "#00E5FF",                    # Cyan brilhante
     "Não Linear Geométrico": "#FFAB00",     # Laranja
@@ -334,8 +334,6 @@ def plot_Momento_vs_Rigidez(data):
     for label, (x, y) in data.items():
         color = COLORS.get(label, "#FFFFFF")
         linestyle = '-' if label == "Linear" else '--'
-        
-        # Ordena os valores no eixo X para a linha ser desenhada sem "zigue-zague"
         idx_sort = np.argsort(x)
         plt.plot(x[idx_sort], y[idx_sort], linestyle=linestyle, color=color, label=label, linewidth=2)
 
@@ -348,8 +346,6 @@ def plot_Momento_vs_Rigidez(data):
 
 def plot_deslocamentos(data, L):
     fig = plt.figure(figsize=(9, 6))
-    
-    # Barra de referência (Pilar vertical)
     plt.plot([0, 0], [0, L], color='white', linewidth=2, zorder=1)
 
     for series in data:
@@ -359,7 +355,6 @@ def plot_deslocamentos(data, L):
         
         color = COLORS.get(label, "#FFFFFF")
         linestyle = '-' if label == "Linear" else '--' if "Físico" not in label else '-.'
-
         plt.plot(series['Z'], y, linestyle=linestyle, color=color, label=label, linewidth=2, zorder=2)
 
     plt.xlabel('Deslocamento [m]')
@@ -372,8 +367,6 @@ def plot_deslocamentos(data, L):
 
 def plot_momentos_fletores(data, L):
     fig = plt.figure(figsize=(9, 6))
-    
-    # Barra de referência
     plt.plot([0, 0], [0, L], color='white', linewidth=2, linestyle='-', label='_nolegend_', zorder=1)
 
     for series in data:
@@ -383,7 +376,6 @@ def plot_momentos_fletores(data, L):
         
         color = COLORS.get(label, "#FFFFFF")
         linestyle = '-' if label == "Linear" else '--' if "Físico" not in label else '-.'
-
         plt.plot(series['M'], y, linestyle=linestyle, color=color, label=label, linewidth=2, zorder=2)
 
     plt.xlabel('Momento Fletor [kN.m]')
@@ -401,7 +393,6 @@ def tabela_deslocamentos_st(datatable, pos_impacto, delta_z):
     for item in datatable:
         Z = item['Z'].flatten()
         val_impacto = Z[idx] if idx is not None and idx < len(Z) else "N/A"
-        
         records.append({
             'Análise': item['label'], 
             'Máximo (m)': max(Z), 
@@ -417,7 +408,6 @@ def tabela_momentos_fletores_st(datatable, pos_impacto, delta_z):
     for item in datatable:
         M = item['M'].flatten()
         val_impacto = M[idx] if idx is not None and idx < len(M) else "N/A"
-        
         records.append({
             'Análise': item['label'], 
             'Máximo (kN.m)': max(M), 
@@ -467,12 +457,10 @@ def plot_fator_seguranca_final(arr_momentos, m_resistente, L, limite_escala=35.0
 
     fig, ax = plt.subplots(figsize=(9, 6))
     
-    # Zona de falha com cor escura
     ax.axvspan(0, 1.0, color='#4A1515', alpha=0.6, zorder=0)
     ax.axvline(x=1.0, color='#FF1744', linestyle='--', linewidth=2, zorder=1, label='Limite ($M_{sd} = M_{rd}$)')
     ax.text(1.15, L*0.96, '$M_{sd} = M_{rd}$', color='#FF1744', fontsize=10, ha='left', va='top', fontweight='bold')
     
-    # Curva principal
     ax.plot(fs_plot, z_vals, color='#00E5FF', linestyle='-', linewidth=2, zorder=3, label='FSI Calculado')
     ax.fill_betweenx(z_vals, 0, fs_plot, color='#00E5FF', alpha=0.15, zorder=2)
 
@@ -514,7 +502,6 @@ def plot_fator_seguranca_final(arr_momentos, m_resistente, L, limite_escala=35.0
 # ==========================================
 st.sidebar.header("📊 Dados de Entrada")
 
-# Menus alterados para Radio Buttons
 tipo_secao = st.sidebar.radio("Tipo de Seção", ["Retangular", "Circular"])
 cond_contorno = st.sidebar.radio("Condição de Contorno", ["Biapoiado", "Engastado (Em balanço)"])
 
@@ -533,7 +520,6 @@ L = st.sidebar.number_input("Comprimento L (m)", value=3.4)
 st.sidebar.subheader("Armadura e Materiais")
 bitola = st.sidebar.number_input("Bitola (mm)", value=20.0 if tipo_secao=="Retangular" else 25.0)
 
-# NOVO: Inserção dinâmica da quantidade de barras
 if tipo_secao == "Retangular":
     n_str = st.sidebar.text_input("Distribuição das barras", value="2, 2", 
                                   help="Digite a quantidade de barras por camada separada por vírgula. Ex: '3, 2, 3' indica 3 camadas de armadura, onde a primeira e a última são as faces extremas da seção.")
@@ -556,7 +542,6 @@ k = 1 - (ε0 / εu)
 st.sidebar.divider()
 
 st.sidebar.subheader("Carregamentos")
-# Adicionado guia com convenção de sinais corrigida
 st.sidebar.info("""
 **Convenção de Sinais:**
 * **Nd:** (+) Compressão
@@ -591,18 +576,26 @@ st.sidebar.divider()
 if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_width=True):
     with st.spinner("Realizando análise das seções transversais e esforços não lineares..."):
         
-        # --- PREPARAÇÃO DA ARMADURA ---
+        # --- PREPARAÇÃO DA ARMADURA E GEOMETRIA DO CONCRETO (b_array) ---
         if tipo_secao == "Retangular":
             try:
-                # Transforma a string do input (ex: "2, 2") em um numpy array
                 n_list = [int(x.strip()) for x in n_str.split(',')]
                 n = np.array(n_list)
             except ValueError:
-                st.error("Formato inválido na 'Distribuição das barras'. Use apenas números inteiros separados por vírgula (ex: 2, 2).")
+                st.error("Formato inválido na 'Distribuição das barras'. Use apenas inteiros separados por vírgula.")
                 st.stop()
                 
             nLinha = len(n)
             ds = np.linspace(-h/2 + dLinha, h/2 - dLinha, nLinha)
+            
+            # Vetores limitadores de integração de concreto
+            dc_raiz = np.arange(0, h, 0.01)
+            dc_raiz = np.append(dc_raiz, h)
+            b_array_raiz = np.full_like(dc_raiz, b)
+            
+            dc_nm = np.arange(-h/2, h/2, 0.01)
+            dc_nm = np.append(dc_nm, h/2)
+            b_array_nm = np.full_like(dc_nm, b)
         else:
             R_efet = (D/2) - (dLinha)
             nLinha = int(n_barras_circ)
@@ -612,6 +605,17 @@ if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_wid
             ds = np.unique(np.round(ds, 6))
             n = np.ones_like(ds)
             n[1:-1] = 2
+            
+            # Vetores limitadores de integração de concreto (circular acompanha a curvatura)
+            dc_raiz = np.arange(0, h, 0.01)
+            dc_raiz = np.append(dc_raiz, h)
+            inside_sqrt_raiz = np.maximum((D/2)**2 - (dc_raiz - h/2)**2, 0)
+            b_array_raiz = 2 * np.sqrt(inside_sqrt_raiz)
+            
+            dc_nm = np.arange(-D/2, D/2, 0.01)
+            dc_nm = np.append(dc_nm, D/2)
+            inside_sqrt_nm = np.maximum((D/2)**2 - dc_nm**2, 0)
+            b_array_nm = 2 * np.sqrt(inside_sqrt_nm)
 
         bitolas_array = np.array([10.0, 12.5, 16.0, 20.0, 25.0, 32.0])
         areas = np.array([0.0000785, 0.000122, 0.000201, 0.000314, 0.000491, 0.000804])
@@ -633,7 +637,7 @@ if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_wid
             
             W_NLG = DeslocamentoLateralBIAPOIADOS(nNos, DeltaZ, Nd, qd, MBd, MTd, EIef, Pos_Fveic, Fveic)
             M_NLG = MomentoFletorBIAPOIADO(nNos, DeltaZ, EIef, MBd, MTd, W_NLG)
-        else: # Engastado
+        else:
             r_val = 0 if tipo_secao == "Retangular" else D/2
             E_val = 0 if tipo_secao == "Retangular" else E
             EIef = RigidezFlexaoConstante(b, h, r_val, 0, E_val, 1) * np.ones(nNos+1)
@@ -646,19 +650,22 @@ if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_wid
 
         # --- DIMENSIONAMENTO (x_raiz) ---
         Md = max(np.absolute(M_NLG))
-        x_raiz = fsolve(lambda x: EquiDasForcasEMomentos(x, b, h, ds, n, fcd, fyd, Es, ε0, εu, k, Nd, Md), h/2)
+        x_raiz_vetor = fsolve(lambda x: EquiDasForcasEMomentos(x, b_array_raiz, h, ds, n, fcd, fyd, Es, ε0, εu, k, Nd, Md), h/2)
+        x_raiz = x_raiz_vetor[0]
         
         # --- DIAGRAMA N, M, 1/r ---
-        dc = np.arange(-h/2, h/2, 0.01) if tipo_secao == "Retangular" else np.arange(-D/2, D/2, 0.01)
-        dc = np.append(dc, h/2) if tipo_secao == "Retangular" else np.append(dc, D/2)
-
-        def gerar_curva_NM(coef, limit_M=None):
+        def gerar_curva_NM(coef_val, limit_M=None):
             χ_arr, M_arr = [], []
             εm_chute, χ, inc_χ = 0.001, 0, 0.00001
+            
+            is_11 = abs(coef_val - 1.1) < 1e-5
+            N_aplicado = Nd / 1.1 if is_11 else Nd
+            
             while True:
-                εm_r = fsolve(lambda εm: EquiDasForcas(b,h,dc,ds,As,fcd,fyd,Es,ε0,εu,Nd/coef if coef==1.1 else Nd,εm,χ,coef), εm_chute)
-                M_val = MomentoEquilibrante(b,h,dc,ds,As,fcd,fyd,Es,ε0,εu,Nd/coef if coef==1.1 else Nd,εm_r,χ,coef)
-                deforms = ε(χ, dc, εm_r[0])
+                εm_r = fsolve(lambda εm: EquiDasForcas(b_array_nm, h, dc_nm, ds, As, fcd, fyd, Es, ε0, εu, N_aplicado, εm, χ, coef_val), εm_chute)
+                M_val = MomentoEquilibrante(b_array_nm, h, dc_nm, ds, As, fcd, fyd, Es, ε0, εu, N_aplicado, εm_r, χ, coef_val)
+                deforms = ε(χ, dc_nm, εm_r[0])
+                
                 if limit_M and M_val > limit_M: break
                 if not limit_M and (np.any(deforms > 0.0035) or np.any(deforms < -0.01)): break
                 
