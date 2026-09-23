@@ -229,7 +229,7 @@ def εlim(d, x, h, ε0, εu, k, ds):
 
 def σconcrete(εc, ε0, εu, fcd, coef):
     σc = np.zeros_like(εc)
-    fck_MPa = (fcd * 1.4) / 1000
+    fck_MPa = (fcd * 1.2) / 1000
     ηc = 1.0 if fck_MPa <= 40 else (40/fck_MPa)**(1/3)
     n = 2.0 if fck_MPa <= 50 else 1.4 + 23.4 * ((90 - fck_MPa)/100)**4
 
@@ -532,8 +532,8 @@ fck = st.sidebar.number_input("fck (kN/m²)", value=30000)
 fyk = st.sidebar.number_input("fyk (kN/m²)", value=500000)
 Es = st.sidebar.number_input("Es (kN/m²)", value=210000000)
 
-fcd = fck / 1.4
-fyd = fyk / 1.15
+fcd = fck / 1.2
+fyd = fyk / 1.0
 E = 2.454e7
 ε0 = 0.002
 εu = 0.0035
