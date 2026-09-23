@@ -547,12 +547,13 @@ k = 1 - (ε0 / εu)
 st.sidebar.divider()
 
 st.sidebar.subheader("Carregamentos")
-# Adicionado guia com convenção de sinais
+# Adicionado guia com convenção de sinais corrigida
 st.sidebar.info("""
 **Convenção de Sinais:**
 * **Nd:** (+) Compressão
 * **qd:** (+) Para a direita
-* **MBd / MTd:** (+) Horário
+* **MBd:** (+) Sentido horário
+* **MTd:** (+) Sentido anti-horário
 * **QTd / Fveic:** (+) Para a direita
 """)
 
@@ -713,7 +714,6 @@ if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_wid
         with tab2:
             st.subheader("Diagrama M x EIef")
             EIef_plt = EIef[0]*np.ones_like(M_NLG)
-            # Ordenando os dados no eixo X corrigirá o problema do gráfico não aparecer
             data_rigid = {
                 'Linear': (M_P0, EIef_plt), 
                 'Não Linear Geométrico e Físico': (M_NLG_NLF, EIef_NL_final)
@@ -722,7 +722,6 @@ if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_wid
 
         with tab3:
             st.subheader("Deslocamento ao longo do pilar")
-            # Nomes ajustados para exibição
             data_desl = [{'Z': W_P0, 'label': "Linear"},
                          {'Z': W_NLG, 'label': "Não Linear Geométrico"},
                          {'Z': W_NLG_NLF, 'label': "Não Linear Geométrico e Físico"}]
@@ -732,7 +731,6 @@ if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_wid
 
         with tab4:
             st.subheader("Momento Fletor ao longo do pilar")
-            # Nomes ajustados para exibição
             data_mf = [{'M': M_P0, 'label': "Linear"},
                        {'M': M_NLG, 'label': "Não Linear Geométrico"},
                        {'M': γf3*M_NLG_NLF, 'label': "Não Linear Geométrico e Físico"}]
