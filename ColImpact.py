@@ -11,12 +11,25 @@ import pandas as pd
 # ==========================================
 # 0. CONFIGURAÇÕES DA PÁGINA STREAMLIT
 # ==========================================
-st.set_page_config(page_title="ColImpact", layout="wide")
+st.set_page_config(page_title="ColImpact", layout="wide", initial_sidebar_state="expanded")
+
+# Força o estilo escuro/profissional no Matplotlib
+plt.style.use('dark_background')
+plt.rcParams.update({
+    'axes.facecolor': '#121212',
+    'figure.facecolor': '#121212',
+    'grid.color': '#333333',
+    'font.family': 'serif',
+    'font.size': 12,
+    'axes.grid': True,
+    'grid.linestyle': '--',
+    'grid.alpha': 0.7
+})
 
 st.title("🏗️ ColImpact (Column Impact Analysis Tool)")
 st.markdown("""
 **Programador:** José Matheus de Castro Rodrigues  
-Este código foi desenvolvido para analisar o comportamento não linear de pilares de concreto armado sujeitos a carregamentos laterais, incluindo os efeitos de impacto de veículos através de Forças Estáticas Equivalentes (FEE).
+Ferramenta para análise avançada do comportamento não linear de pilares de concreto armado sujeitos a carregamentos laterais e impacto de veículos.
 """)
 
 # ==========================================
@@ -286,121 +299,131 @@ def momento_fissuracao(fck, b, h, D, x_raiz, alpha=1.5):
 # ==========================================
 # 3. FUNÇÕES DE PÓS-PROCESSAMENTO (GRÁFICOS P/ STREAMLIT)
 # ==========================================
-def plot_Momento_curvatura(data, language='pt', xlabel=None, ylabel=None):
-    fig = plt.figure(figsize=(9, 6))
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.size'] = 12
-    plt.rcParams['axes.grid'] = True
-    plt.rcParams['grid.linestyle'] = '--'
-    plt.rcParams['grid.alpha'] = 0.7
 
+# Paleta de cores para os gráficos
+COLORS = {
+    "Linear": "#00E5FF",                    # Cyan brilhante
+    "Não Linear Geométrico": "#FFAB00",     # Laranja
+    "Não Linear Geométrico e Físico": "#FF1744" # Vermelho
+}
+
+def plot_Momento_curvatura(data):
+    fig = plt.figure(figsize=(9, 6))
     if not data:
         st.warning("Nenhum dado fornecido.")
         return
 
     for label, (x, y) in data.items():
-        x = np.array(x)
-        y = np.array(y)
-        color = 'red' if 'Código Implementado' in label or 'Implemented Code' in label else 'black'
-        
-        if '0.85 fcd' in label: linestyle = '-'
-        elif '1.1 fcd' in label: linestyle = '--'
-        else: linestyle = '-'
-        
+        if '0.85' in label:
+            color, linestyle = '#E040FB', '-'  # Roxo
+        else:
+            color, linestyle = '#76FF03', '--' # Verde Limão
+            
         plt.plot(x, y, linestyle=linestyle, color=color, label=label, linewidth=2)
 
-    xlabel = 'Curvatura ($\chi$) [1/m]' if language == 'pt' else 'Curvature ($\chi$) [1/m]'
-    ylabel = 'Momento Fletor [kN.m]' if language == 'pt' else 'Bending Moment [kN.m]'
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.legend(loc='lower right', frameon=True)
+    plt.xlabel('Curvatura ($\chi$) [1/m]')
+    plt.ylabel('Momento Fletor [kN.m]')
+    plt.legend(loc='lower right', frameon=True, facecolor='#121212', edgecolor='white')
     plt.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
 
-def plot_Momento_vs_Rigidez(data, language='pt'):
+def plot_Momento_vs_Rigidez(data):
     fig = plt.figure(figsize=(9, 6))
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.size'] = 12
-    plt.rcParams['axes.grid'] = True
-    plt.rcParams['grid.linestyle'] = '--'
-    plt.rcParams['grid.alpha'] = 0.7
-
-    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
-    for i, (label, (x, y)) in enumerate(data.items()):
-        plt.plot(x, y, linestyle=['-', '--', '-.', ':'][i % 4], color=colors[i % len(colors)], label=label)
-
-    xlabel = 'Momento Fletor [kN.m]' if language == 'pt' else 'Bending Moment [kN.m]'
-    ylabel = 'Rigidez (EI) [kN.m²]' if language == 'pt' else 'Flexural Stiffness (EI) [kN.m²]'
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.legend(loc='best', frameon=True)
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close(fig)
-
-def plot_deslocamentos(data, L, language='pt'):
-    fig = plt.figure(figsize=(9, 6))
-    plt.rcParams.update({'font.family': 'serif', 'font.size': 12, 'axes.grid': True, 'grid.linestyle': '--', 'grid.alpha': 0.7})
     
-    line_styles = ['-', '--', '-.', ':']
-    plt.plot([0, 0], [0, L], color='black', linewidth=1.5, zorder=1)
+    for label, (x, y) in data.items():
+        color = COLORS.get(label, "#FFFFFF")
+        linestyle = '-' if label == "Linear" else '--'
+        
+        # Ordena os valores no eixo X para a linha ser desenhada sem "zigue-zague"
+        idx_sort = np.argsort(x)
+        plt.plot(x[idx_sort], y[idx_sort], linestyle=linestyle, color=color, label=label, linewidth=2)
 
-    for i, series in enumerate(data):
+    plt.xlabel('Momento Fletor [kN.m]')
+    plt.ylabel('Rigidez (EI) [kN.m²]')
+    plt.legend(loc='best', frameon=True, facecolor='#121212', edgecolor='white')
+    plt.tight_layout()
+    st.pyplot(fig)
+    plt.close(fig)
+
+def plot_deslocamentos(data, L):
+    fig = plt.figure(figsize=(9, 6))
+    
+    # Barra de referência (Pilar vertical)
+    plt.plot([0, 0], [0, L], color='white', linewidth=2, zorder=1)
+
+    for series in data:
         n_points = len(series['Z'])
         y = np.linspace(0, L, n_points)
         label = series['label']
-        color = 'red' if 'Código Implementado' in label or 'Implemented Code' in label else 'black'
-        linestyle = line_styles[i % len(line_styles)]
-        plt.plot(series['Z'], y, linestyle=linestyle, color=color, label=label, linewidth=1.5, zorder=2)
+        
+        color = COLORS.get(label, "#FFFFFF")
+        linestyle = '-' if label == "Linear" else '--' if "Físico" not in label else '-.'
 
-    xlabel = 'Deslocamento [m]' if language == 'pt' else 'Displacement [m]'
-    ylabel = 'Posição ao longo do pilar [m]' if language == 'pt' else 'Position along the column [m]'
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.legend(loc='best', frameon=True)
+        plt.plot(series['Z'], y, linestyle=linestyle, color=color, label=label, linewidth=2, zorder=2)
+
+    plt.xlabel('Deslocamento [m]')
+    plt.ylabel('Posição ao longo do pilar [m]')
+    plt.legend(loc='best', frameon=True, facecolor='#121212', edgecolor='white')
     plt.ylim(0, L)
     plt.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
 
-def plot_momentos_fletores(data, L, language='pt'):
+def plot_momentos_fletores(data, L):
     fig = plt.figure(figsize=(9, 6))
-    plt.rcParams.update({'font.family': 'serif', 'font.size': 12, 'axes.grid': True, 'grid.linestyle': '--', 'grid.alpha': 0.7})
     
-    line_styles = ['-', '--', '-.', ':']
-    plt.plot([0, 0], [0, L], color='black', linewidth=1.5, linestyle='-', label='_nolegend_', zorder=1)
+    # Barra de referência
+    plt.plot([0, 0], [0, L], color='white', linewidth=2, linestyle='-', label='_nolegend_', zorder=1)
 
-    for i, series in enumerate(data):
+    for series in data:
         n_points = len(series['M'])
         y = np.linspace(0, L, n_points)
         label = series['label']
-        color = 'red' if 'Código Implementado' in label or 'Implemented Code' in label else 'black'
-        linestyle = line_styles[i % len(line_styles)]
-        plt.plot(series['M'], y, linestyle=linestyle, color=color, label=label, linewidth=1.5, zorder=2)
+        
+        color = COLORS.get(label, "#FFFFFF")
+        linestyle = '-' if label == "Linear" else '--' if "Físico" not in label else '-.'
 
-    xlabel = 'Momento Fletor [kN.m]' if language == 'pt' else 'Bending Moment [kN.m]'
-    ylabel = 'Posição ao longo do pilar [m]' if language == 'pt' else 'Position along the column [m]'
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.legend(loc='best', frameon=True)
+        plt.plot(series['M'], y, linestyle=linestyle, color=color, label=label, linewidth=2, zorder=2)
+
+    plt.xlabel('Momento Fletor [kN.m]')
+    plt.ylabel('Posição ao longo do pilar [m]')
+    plt.legend(loc='best', frameon=True, facecolor='#121212', edgecolor='white')
     plt.ylim(0, L)
     plt.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
 
-def tabela_deslocamentos_st(datatable):
+def tabela_deslocamentos_st(datatable, pos_impacto, delta_z):
     records = []
+    idx = int(round(pos_impacto / delta_z)) if pos_impacto is not None else None
+    
     for item in datatable:
         Z = item['Z'].flatten()
-        records.append({'Curvas': item['label'], 'Desl. Máx. (m)': max(Z), 'Desl. Mín. (m)': min(Z)})
+        val_impacto = Z[idx] if idx is not None and idx < len(Z) else "N/A"
+        
+        records.append({
+            'Análise': item['label'], 
+            'Máximo (m)': max(Z), 
+            'Mínimo (m)': min(Z),
+            'No Impacto (m)': val_impacto
+        })
     return pd.DataFrame(records)
 
-def tabela_momentos_fletores_st(datatable):
+def tabela_momentos_fletores_st(datatable, pos_impacto, delta_z):
     records = []
+    idx = int(round(pos_impacto / delta_z)) if pos_impacto is not None else None
+    
     for item in datatable:
-        Z = item['M'].flatten()
-        records.append({'Curvas': item['label'], 'MF. Máx. (kN.m)': max(Z), 'MF Mín. (kN.m)': min(Z)})
+        M = item['M'].flatten()
+        val_impacto = M[idx] if idx is not None and idx < len(M) else "N/A"
+        
+        records.append({
+            'Análise': item['label'], 
+            'Máximo (kN.m)': max(M), 
+            'Mínimo (kN.m)': min(M),
+            'No Impacto (kN.m)': val_impacto
+        })
     return pd.DataFrame(records)
 
 def tabela_fs(arr_momentos, m_resistente):
@@ -443,13 +466,15 @@ def plot_fator_seguranca_final(arr_momentos, m_resistente, L, limite_escala=35.0
     z_critico = z_vals[min_fs_idx]
 
     fig, ax = plt.subplots(figsize=(9, 6))
-    plt.rcParams.update({'font.family': 'serif', 'font.size': 12, 'axes.grid': True, 'grid.linestyle': '--'})
     
-    ax.axvspan(0, 1.0, color='#ffe6e6', alpha=1.0, zorder=0)
-    ax.axvline(x=1.0, color='#d62728', linestyle='--', linewidth=1.5, zorder=1, label='Limite ($M_{sd} = M_{rd}$)')
-    ax.text(1.15, L*0.96, '$M_{sd} = M_{rd}$', color='#d62728', fontsize=10, ha='left', va='top', fontweight='bold')
-    ax.plot(fs_plot, z_vals, color='#003366', linestyle='-', linewidth=1.5, zorder=3, label='FSI Calculado')
-    ax.fill_betweenx(z_vals, 0, fs_plot, color='#003366', alpha=0.1, zorder=2)
+    # Zona de falha com cor escura
+    ax.axvspan(0, 1.0, color='#4A1515', alpha=0.6, zorder=0)
+    ax.axvline(x=1.0, color='#FF1744', linestyle='--', linewidth=2, zorder=1, label='Limite ($M_{sd} = M_{rd}$)')
+    ax.text(1.15, L*0.96, '$M_{sd} = M_{rd}$', color='#FF1744', fontsize=10, ha='left', va='top', fontweight='bold')
+    
+    # Curva principal
+    ax.plot(fs_plot, z_vals, color='#00E5FF', linestyle='-', linewidth=2, zorder=3, label='FSI Calculado')
+    ax.fill_betweenx(z_vals, 0, fs_plot, color='#00E5FF', alpha=0.15, zorder=2)
 
     is_inf = (fs_vals >= limite_escala)
     if np.any(is_inf):
@@ -459,14 +484,14 @@ def plot_fator_seguranca_final(arr_momentos, m_resistente, L, limite_escala=35.0
         for start, end in zip(starts, ends):
             z_inf = z_vals[(start + end) // 2]
             ax.annotate(r'$\infty$', xy=(limite_escala, z_inf + 0.1), xytext=(limite_escala - 1.5, z_inf + 0.1),
-                        arrowprops=dict(arrowstyle='->', color='#003366', linewidth=1.5),
-                        fontsize=16, color='#003366', va='center', ha='right', zorder=5)
+                        arrowprops=dict(arrowstyle='->', color='#00E5FF', linewidth=1.5),
+                        fontsize=16, color='#00E5FF', va='center', ha='right', zorder=5)
 
-    ax.scatter([min_fs], [z_critico], color='white', edgecolors='red', s=60, linewidth=1.5, zorder=4)
+    ax.scatter([min_fs], [z_critico], color='#121212', edgecolors='#FF1744', s=60, linewidth=2, zorder=4)
     ax.annotate(f'{min_fs:.2f}', xy=(min_fs, z_critico), xytext=(min_fs + 2.0, z_critico),
-                 arrowprops=dict(arrowstyle='-|>', color='black', shrinkA=5, shrinkB=5, linewidth=1.0),
-                 fontsize=12, fontweight='bold', color='red', va='center', ha='left',
-                 bbox=dict(boxstyle="square,pad=0.1", fc="white", ec="none", alpha=0.7))
+                 arrowprops=dict(arrowstyle='-|>', color='white', shrinkA=5, shrinkB=5, linewidth=1.0),
+                 fontsize=12, fontweight='bold', color='#FF1744', va='center', ha='left',
+                 bbox=dict(boxstyle="square,pad=0.2", fc="#2A2A2A", ec="#FF1744", alpha=0.9))
 
     ax.set_xlabel('Fator de Segurança de Impacto (FSI)')
     ax.set_ylabel('Posição ao longo do pilar [m]')
@@ -478,13 +503,8 @@ def plot_fator_seguranca_final(arr_momentos, m_resistente, L, limite_escala=35.0
     labels = [str(int(t)) for t in ticks]
     labels[-1] = r'$\geq$' + str(int(limite_escala))
     ax.set_xticklabels(labels)
-    
-    for spine in ax.spines.values():
-        spine.set_visible(True)
-        spine.set_linewidth(1.0)
-        spine.set_color('black')
 
-    ax.legend(loc='best', frameon=True)
+    ax.legend(loc='best', frameon=True, facecolor='#121212', edgecolor='white')
     plt.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
@@ -493,8 +513,12 @@ def plot_fator_seguranca_final(arr_momentos, m_resistente, L, limite_escala=35.0
 # 4. INTERFACE E EXECUÇÃO
 # ==========================================
 st.sidebar.header("📊 Dados de Entrada")
-tipo_secao = st.sidebar.selectbox("Tipo de Seção", ["Retangular", "Circular"])
-cond_contorno = st.sidebar.selectbox("Condição de Contorno", ["Biapoiado", "Engastado (Em balanço)"])
+
+# Menus alterados para Radio Buttons
+tipo_secao = st.sidebar.radio("Tipo de Seção", ["Retangular", "Circular"])
+cond_contorno = st.sidebar.radio("Condição de Contorno", ["Biapoiado", "Engastado (Em balanço)"])
+
+st.sidebar.divider()
 
 st.sidebar.subheader("Geometria")
 if tipo_secao == "Retangular":
@@ -520,7 +544,18 @@ E = 2.454e7
 εu = 0.0035
 k = 1 - (ε0 / εu)
 
+st.sidebar.divider()
+
 st.sidebar.subheader("Carregamentos")
+# Adicionado guia com convenção de sinais
+st.sidebar.info("""
+**Convenção de Sinais:**
+* **Nd:** (+) Compressão
+* **qd:** (+) Para a direita
+* **MBd / MTd:** (+) Horário
+* **QTd / Fveic:** (+) Para a direita
+""")
+
 Nd = st.sidebar.number_input("Nd (kN)", value=1127.9 if tipo_secao=="Retangular" else 300.0)
 qd = st.sidebar.number_input("qd (kN/m)", value=-5.32 if tipo_secao=="Retangular" else 0.0)
 if cond_contorno == "Biapoiado":
@@ -541,7 +576,9 @@ DeltaZ = 0.05
 nNos = int(L/DeltaZ + 1)
 γf3 = 1.1
 
-if st.sidebar.button("🚀 Executar Análise"):
+st.sidebar.divider()
+
+if st.sidebar.button("🚀 Executar Análise", type="primary", use_container_width=True):
     with st.spinner("Realizando análise das seções transversais e esforços não lineares..."):
         
         # --- PREPARAÇÃO DA ARMADURA ---
@@ -656,7 +693,7 @@ if st.sidebar.button("🚀 Executar Análise"):
             W_prev = np.copy(W_NLG_NLF)
             EIef_NL_corrigido = np.pad(EIef_NL_final, pad_mode, mode='edge')
 
-        st.success(f"✅ Análise iterativa concluída com sucesso (Iterações: {iter_count}).")
+        st.success(f"✅ Análise concluída. Convergência alcançada em {iter_count} iterações.")
 
         # ==========================================
         # IMPRIMINDO RESULTADOS (UI STREAMLIT)
@@ -668,33 +705,39 @@ if st.sidebar.button("🚀 Executar Análise"):
         with tab1:
             st.subheader("Diagrama N, M, 1/r")
             data_curv = {
-                '0.85 fcd - Código Implementado': (χ_values_85, M_values_85),
-                '1.1 fcd - Código Implementado': (χ_values_11, M_values_11)
+                'Curva com 0.85 fcd': (χ_values_85, M_values_85),
+                'Curva com 1.1 fcd': (χ_values_11, M_values_11)
             }
             plot_Momento_curvatura(data_curv)
 
         with tab2:
             st.subheader("Diagrama M x EIef")
             EIef_plt = EIef[0]*np.ones_like(M_NLG)
-            data_rigid = {'Linear': (M_P0, EIef_plt), 'Não Linear': (M_NLG_NLF, EIef_NL_final)}
+            # Ordenando os dados no eixo X corrigirá o problema do gráfico não aparecer
+            data_rigid = {
+                'Linear': (M_P0, EIef_plt), 
+                'Não Linear Geométrico e Físico': (M_NLG_NLF, EIef_NL_final)
+            }
             plot_Momento_vs_Rigidez(data_rigid)
 
         with tab3:
             st.subheader("Deslocamento ao longo do pilar")
-            data_desl = [{'Z': W_P0, 'label': "LG & LF - Código Implementado"},
-                         {'Z': W_NLG, 'label': "NLG & LF - Código Implementado"},
-                         {'Z': W_NLG_NLF, 'label': "NLG & NLF - Código Implementado"}]
+            # Nomes ajustados para exibição
+            data_desl = [{'Z': W_P0, 'label': "Linear"},
+                         {'Z': W_NLG, 'label': "Não Linear Geométrico"},
+                         {'Z': W_NLG_NLF, 'label': "Não Linear Geométrico e Físico"}]
             
-            st.dataframe(tabela_deslocamentos_st(data_desl), use_container_width=True)
+            st.dataframe(tabela_deslocamentos_st(data_desl, Pos_Fveic, DeltaZ), use_container_width=True)
             plot_deslocamentos(data_desl, L)
 
         with tab4:
             st.subheader("Momento Fletor ao longo do pilar")
-            data_mf = [{'M': M_P0, 'label': "LG & LF - Código Implementado"},
-                       {'M': M_NLG, 'label': "NLG & LF - Código Implementado"},
-                       {'M': γf3*M_NLG_NLF, 'label': "NLG & NLF - Código Implementado"}]
+            # Nomes ajustados para exibição
+            data_mf = [{'M': M_P0, 'label': "Linear"},
+                       {'M': M_NLG, 'label': "Não Linear Geométrico"},
+                       {'M': γf3*M_NLG_NLF, 'label': "Não Linear Geométrico e Físico"}]
                        
-            st.dataframe(tabela_momentos_fletores_st(data_mf), use_container_width=True)
+            st.dataframe(tabela_momentos_fletores_st(data_mf, Pos_Fveic, DeltaZ), use_container_width=True)
             plot_momentos_fletores(data_mf, L)
 
         with tab5:
