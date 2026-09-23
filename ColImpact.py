@@ -532,8 +532,8 @@ fck = st.sidebar.number_input("fck (kN/m²)", value=30000)
 fyk = st.sidebar.number_input("fyk (kN/m²)", value=500000)
 Es = st.sidebar.number_input("Es (kN/m²)", value=210000000)
 
-fcd = fck / 1.2
-fyd = fyk / 1.0
+fcd = fck / 1.4
+fyd = fyk / 1.15
 E = 2.454e7
 ε0 = 0.002
 εu = 0.0035
